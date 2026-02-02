@@ -1,0 +1,702 @@
+---
+title: "a_01_dataexploration"
+author: "Aline Maybank"
+date: "2026-02-02"
+output: html_document
+---
+
+# Data Exploration of The Loop Dataset
+
+## Packages
+Install packages for this project
+```{r}
+library(tidyverse)
+library(lubridate)
+library(scales)
+```
+
+
+## Data
+Read in the dataset
+```{r}
+loop_data <- read_csv("loop-data-ldw-2026.csv")
+```
+
+
+## Explore the Data
+
+1. Explore the columns of data available
+```{r}
+head(loop_data)
+```
+
+2. Get dataset dimensions
+```{r}
+cat("Rows:", nrow(loop_data), "\n")
+cat("Columns:", ncol(loop_data), "\n\n")
+```
+
+3. Check column names
+```{r}
+glimpse(loop_data)
+```
+
+5. Check for missing values
+```{r}
+missing_values <- colSums(is.na(loop_data))
+print(missing_values)
+
+# Calculate percentage of missing values
+cat("\nPercentage of Missing Values:\n")
+missing_pct <- (missing_values / nrow(loop_data)) * 100
+print(round(missing_pct, 2))
+```
+
+## Data Cleaning
+
+1. Convert timestamp
+
+```{r}
+summary(loop_data$Timestamp)
+sum(is.na(loop_data$Timestamp))
+head(loop_data$Timestamp, 20)
+
+loop_data <- loop_data %>%
+  mutate(
+    Timestamp_dt = mdy_hms(Timestamp, tz = "America/New_York"),
+    `Visit Date` = as.Date(Timestamp_dt)
+  )
+
+sum(is.na(loop_data$Timestamp_dt))
+range(loop_data$`Visit Date`, na.rm = TRUE)
+head(loop_data$`Visit Date`, 10)
+```
+
+2. GWU official colors
+```{r}
+gwu_blue <- "#0A3B5D"
+gwu_gold <- "#A99768"
+gwu_white <- "#FFFFFF"
+gwu_light_blue <- "#0096D6"
+gwu_yellow <- "#FFEFA4"
+
+# Extended sustainability palette (greens/blues for additional categories)
+sustainability_colors <- c(
+  gwu_blue,        # primary
+  gwu_gold,        # secondary
+  gwu_light_blue,  # tertiary
+  "#2E8B57",       # sea green
+  "#4682B4",       # steel blue
+  "#66CDAA",       # medium aquamarine
+  "#5F9EA0",       # cadet blue
+  "#20B2AA",       # light sea green
+  "#48D1CC",       # medium turquoise
+  "#87CEEB"        # sky blue
+)
+
+# Create a custom theme for consistency
+theme_loop <- function() {
+  theme_minimal() +
+    theme(
+      plot.title = element_text(color = gwu_blue, face = "bold", size = 14),
+      axis.title = element_text(color = gwu_blue, face = "bold"),
+      axis.text = element_text(color = gwu_blue),
+      panel.grid.major = element_line(color = gwu_yellow),
+      panel.grid.minor = element_blank()
+    )
+}
+```
+
+
+## Data Distributions
+
+### 1. Loop Visitor Status
+
+What is the spread of undergrad student/grad student/staff/faculty/non-GWU status?
+```{r}
+demo_table <- table(loop_data$Demographics)
+print(demo_table)
+print(prop.table(demo_table) * 100) # percentages
+```
+
+1.2 Visualize the distribution of status'.
+```{r}
+demo_data <- loop_data %>%
+  count(Demographics) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+ggplot(demo_data, aes(x = reorder(Demographics, -n), y = n, fill = Demographics)) +
+  geom_col() +
+  geom_text(aes(label = paste0(n, "\n(", round(percentage, 1), "%)")), 
+            vjust = -0.5, color = gwu_blue, fontface = "bold", size = 3.5) +
+  scale_fill_manual(values = c(
+    "Undergraduate" = gwu_blue,
+    "Graduate" = gwu_gold,
+    "Staff" = gwu_light_blue,
+    "Non-GW Community Member" = "#2E8B57"
+  )) +
+  labs(title = "Who Visits The Loop?",
+       subtitle = "Demographics of Loop Visitors",
+       x = "",
+       y = "Number of Visits") +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+```
+
+### 2. Donation behaviour
+
+What is the most common ways donations were brought in to the Loop?
+```{r}
+donation_table <- table(loop_data$`Did you bring donations with you today?`)
+print(donation_table)
+print(prop.table(donation_table) * 100)
+```
+
+Visualization of donation type preference
+```{r}
+donation_data <- loop_data %>%
+  count(`Did you bring donations with you today?`) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+ggplot(donation_data, aes(x = reorder(`Did you bring donations with you today?`, -n), 
+                           y = n, 
+                           fill = `Did you bring donations with you today?`)) +
+  geom_col() +
+  geom_text(aes(label = paste0(n, "\n(", round(percentage, 1), "%)")), 
+            vjust = -0.5, color = gwu_blue, fontface = "bold", size = 3.5) +
+  scale_fill_manual(values = c(
+    "Yes" = "#2E8B57",  # green for yes
+    "No" = gwu_gold,
+    "Donated at blue bin" = gwu_light_blue
+  )) +
+  labs(title = "How Do People Donate to The Loop?",
+       subtitle = "Donation Behavior of Loop Visitors",
+       x = "",
+       y = "Number of Visits") +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+```
+
+### 3. Experience Rating 
+
+Ratings given by Loop visitors about their experience
+```{r}
+rating_table <- table(loop_data$`Experience Rating`)
+print(rating_table)
+print(prop.table(rating_table) * 100)
+```
+
+Visualization of visitor status
+```{r}
+rating_data <- loop_data %>%
+  count(`Experience Rating`) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+ggplot(rating_data, aes(x = factor(`Experience Rating`), y = n)) +
+  geom_col(fill = gwu_blue, alpha = 0.8) +
+  geom_text(aes(label = paste0(n, "\n(", round(percentage, 1), "%)")), 
+            vjust = -0.5, color = gwu_blue, fontface = "bold", size = 3.5) +
+  labs(title = "Visitor Experience Ratings",
+       subtitle = paste0("Average Rating: ", round(mean(loop_data$`Experience Rating`, na.rm = TRUE), 2), " out of 5"),
+       x = "Rating (1-5)",
+       y = "Number of Responses") +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+```
+
+### 4. Clothing Item 
+
+Distribution of clothing item donations
+```{r}
+clothing_items <- c("Tops", "Collared Shirts", "Sweaters", "Pants", 
+                   "Skirts", "Shorts", "Dresses", "Outerwear", 
+                   "Shoes", "Accessories")
+
+cat("Clothing Item Donation Summary:")
+for(item in clothing_items) {
+  cat("\n", item, ":\n")
+  print(summary(loop_data[[item]]))
+}
+```
+
+What is the total items thifted per visit?
+```{r}
+# Total items thrifted per visit
+loop_data <- loop_data %>%
+  mutate(Total_Items = Tops + `Collared Shirts` + Sweaters + Pants + 
+           Skirts + Shorts + Dresses + Outerwear + Shoes + Accessories)
+
+cat("\n===== TOTAL ITEMS PER VISIT =====\n")
+summary(loop_data$Total_Items)
+
+# Visualization - boxplot
+ggplot(loop_data, aes(y = Total_Items)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(title = "Distribution of Total Items thrifted Per Visit",
+       y = "Number of Items") +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+```
+
+Popular clothing items to donate
+```{r}
+# Reshape data for popular items visualization
+items_long <- loop_data %>%
+  select(all_of(clothing_items)) %>%
+  pivot_longer(cols = everything(), 
+               names_to = "Item_Type", 
+               values_to = "Count") %>%
+  group_by(Item_Type) %>%
+  summarise(Total = sum(Count, na.rm = TRUE)) %>%
+  arrange(desc(Total))
+
+cat("\n===== MOST POPULAR ITEMS =====\n")
+print(items_long)
+
+# Visualization
+ggplot(items_long, aes(x = reorder(Item_Type, Total), y = Total, fill = Item_Type)) +
+  geom_col() +
+  geom_text(aes(label = scales::comma(Total)), hjust = -0.2, 
+            color = gwu_blue, fontface = "bold", size = 3) +
+  coord_flip() +
+  scale_fill_manual(values = sustainability_colors) +
+  labs(title = "Most Popular Items at The Loop",
+       subtitle = "Total items thrifted by category since opening",
+       x = "",
+       y = "Total Items Thrifted") +
+  theme_loop() +
+  theme(legend.position = "none") +
+  scale_y_continuous(labels = scales::comma, expand = expansion(mult = c(0, 0.1))) +
+    theme(
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+```
+
+
+### Temporal patters 
+(aka patterns in donations over time)
+
+Visits over time in 2025
+```{r}
+daily_visits <- loop_data %>%
+  count(`Visit Date`)
+
+ggplot(daily_visits, aes(x = `Visit Date`, y = n)) +
+  geom_line(color = gwu_light_blue, linewidth = 1) +
+  geom_point(color = gwu_blue, size = 2) +
+  geom_smooth(method = "loess", se = TRUE, color = gwu_gold, fill = gwu_yellow, alpha = 0.3) +
+  labs(title = "Loop Visits Over Time",
+       subtitle = paste0("From ", min(daily_visits$`Visit Date`), " to ", max(daily_visits$`Visit Date`)),
+       x = "Date",
+       y = "Number of Visits") +
+    theme(
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+```
+
+Monthly patterns
+```{r}
+daily_visits <- loop_data %>%
+  count(`Visit Date`) %>%
+  mutate(`Visit Date` = as.Date(`Visit Date`))
+
+monthly_visits <- loop_data %>%
+  filter(!is.na(`Visit Date`)) %>%
+  mutate(Month_Date = floor_date(`Visit Date`, unit = "month")) %>%
+  count(Month_Date) %>%
+  arrange(Month_Date)
+
+ggplot(monthly_visits, aes(x = Month_Date, y = n)) +
+  geom_line(color = gwu_light_blue, linewidth = 1) +
+  geom_point(color = gwu_blue, size = 2) +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "1 month") +
+  labs(
+    title = "Loop Visits by Month",
+    subtitle = paste0("From ", min(monthly_visits$Month_Date), " to ", max(monthly_visits$Month_Date)),
+    x = "Month",
+    y = "Number of Visits"
+  ) +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+Semester patterns
+```{r}
+loop_data <- loop_data %>%
+  mutate(
+    Semester = case_when(
+      month(`Visit Date`) %in% c(8, 9, 10, 11, 12) ~ "Fall",
+      month(`Visit Date`) %in% c(1, 2, 3, 4, 5) ~ "Spring",
+      TRUE ~ "Summer"
+    ),
+    Semester = factor(Semester, levels = c("Fall", "Spring", "Summer"))
+  )
+
+
+semester_data <- loop_data %>%
+  filter(!is.na(Semester)) %>%
+  count(Semester) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+ggplot(semester_data, aes(x = Semester, y = n, fill = Semester)) +
+  geom_col(width = 0.7) +
+  geom_text(
+    aes(label = paste0(n, "\n(", round(percentage, 1), "%)")),
+    vjust = -0.4, color = gwu_blue, fontface = "bold", size = 4
+  ) +
+  scale_fill_manual(values = c(
+    "Fall" = gwu_gold,
+    "Spring" = "#2E8B57",
+    "Summer" = gwu_light_blue
+  )) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(
+    title = "When Do Students Visit The Loop?",
+    subtitle = "Visits by semester",
+    x = "",
+    y = "Number of Visits"
+  ) +
+  theme_loop() +
+  theme(
+    legend.position = "none",
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+```
+
+
+### Cross tabulations
+
+Experience rating by demographics
+```{r}
+cat("\n===== EXPERIENCE RATING BY DEMOGRAPHICS =====\n")
+loop_data %>%
+  group_by(Demographics) %>%
+  summarise(
+    Mean_Rating = mean(`Experience Rating`, na.rm = TRUE),
+    Median_Rating = median(`Experience Rating`, na.rm = TRUE),
+    SD_Rating = sd(`Experience Rating`, na.rm = TRUE),
+    Count = n()
+  ) %>%
+  print()
+```
+
+Donation behavior by demographics
+```{r}
+cat("Donation Behaviour by demographics:")
+table(loop_data$Demographics, loop_data$`Did you bring donations with you today?`)
+```
+
+Donations type per semester
+```{r}
+# Prep: month/semester + items in long format
+clothing_items <- c("Tops", "Collared Shirts", "Sweaters", "Pants", 
+                    "Skirts", "Shorts", "Dresses", "Outerwear", 
+                    "Shoes", "Accessories")
+
+items_long_time <- loop_data %>%
+  filter(!is.na(`Visit Date`)) %>%
+  mutate(
+    Month_Date = floor_date(`Visit Date`, unit = "month"),
+    Month_Label = format(Month_Date, "%b %Y"),
+    Semester = case_when(
+      month(`Visit Date`) %in% c(8, 9, 10, 11, 12) ~ "Fall",
+      month(`Visit Date`) %in% c(1, 2, 3, 4, 5) ~ "Spring",
+      TRUE ~ "Summer"
+    ),
+    Semester = factor(Semester, levels = c("Fall", "Spring", "Summer"))
+  ) %>%
+  pivot_longer(
+    cols = all_of(clothing_items),
+    names_to = "Item_Type",
+    values_to = "Count"
+  ) %>%
+  mutate(Count = as.numeric(Count)) %>%
+  filter(!is.na(Count), Count > 0)
+
+# Cross tab: Month × Item (totals)
+month_item_totals <- items_long_time %>%
+  group_by(Month_Date, Month_Label, Item_Type) %>%
+  summarise(Total_Donated = sum(Count, na.rm = TRUE), .groups = "drop") %>%
+  arrange(Month_Date, desc(Total_Donated))
+
+print(month_item_totals)
+
+
+# “Top item each month” summary table (super useful)
+top_item_each_month <- month_item_totals %>%
+  group_by(Month_Date, Month_Label) %>%
+  slice_max(Total_Donated, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+print(top_item_each_month)
+
+# Cross tab: Semester × Item (totals)
+semester_item_totals <- items_long_time %>%
+  group_by(Semester, Item_Type) %>%
+  summarise(Total_Donated = sum(Count, na.rm = TRUE), .groups = "drop") %>%
+  arrange(Semester, desc(Total_Donated))
+
+print(semester_item_totals)
+
+# Stacked bar (shows mix by semester)
+ggplot(semester_item_totals, aes(x = Semester, y = Total_Donated, fill = Item_Type)) +
+  geom_col() +
+  labs(
+    title = "Clothing Thrifted by Semester",
+    subtitle = "Composition of donated items by semester",
+    x = "",
+    y = "Total Items Donated",
+    fill = "Item Type"
+  ) +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+# If you want “what’s #1 item each semester”
+top_item_each_semester <- semester_item_totals %>%
+  group_by(Semester) %>%
+  slice_max(Total_Donated, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+print(top_item_each_semester)
+```
+
+
+## Save the cleaned dataset
+```{r}
+# Save the enhanced dataset
+write_csv(loop_data, "loop_data_cleaned.csv")
+
+cat("\n\n===== EXPLORATION COMPLETE =====\n")
+cat("Cleaned data saved to: loop_data_cleaned.csv\n")
+```
+
+## Final Figure Creation
+
+Story: "Seasonal Clothing Cycles" 
+--> Show how different clothing items peak in different seasons - this is super actionable for The Loop to:
+- Plan inventory storage
+- Time donation drives
+- Predict what students need when
+
+```{r}
+## FINAL VISUALIZATION: Seasonal Clothing Patterns at The Loop
+
+# Prepare data: aggregate by month and item type
+seasonal_items <- items_long_time %>%
+  mutate(
+    Month_Name = month(`Visit Date`, label = TRUE, abbr = FALSE),
+    Month_Num = month(`Visit Date`),
+    Season = case_when(
+      Month_Num %in% c(12, 1, 2) ~ "Winter",
+      Month_Num %in% c(3, 4, 5) ~ "Spring",
+      Month_Num %in% c(6, 7, 8) ~ "Summer",
+      Month_Num %in% c(9, 10, 11) ~ "Fall"
+    )
+  ) %>%
+  group_by(Month_Name, Month_Num, Season, Item_Type) %>%
+  summarise(Total_Items = sum(Count, na.rm = TRUE), .groups = "drop") %>%
+  arrange(Month_Num)
+
+# Create a heatmap showing seasonal patterns
+ggplot(seasonal_items, aes(x = Month_Name, y = Item_Type, fill = Total_Items)) +
+  geom_tile(color = "white", linewidth = 1) +
+  geom_text(
+    aes(label = ifelse(Total_Items > 0, Total_Items, "")),
+    color = gwu_blue, fontface = "bold", size = 3
+  ) +
+  scale_fill_gradient(
+    low = "white",
+    high = gwu_light_blue,
+    name = "Items",
+    labels = scales::comma
+  ) +
+  labs(
+    title = "The Loop's Seasonal Clothing Cycles",
+    subtitle = "What GW students swap throughout the year | Darker = More Popular",
+    x = "",
+    y = "",
+    caption = "Data from The Loop @ GW Mount Vernon Campus | Jan - Oct 2025"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(color = gwu_blue, face = "bold", size = 16, hjust = 0),
+    plot.subtitle = element_text(color = gwu_blue, size = 11, hjust = 0),
+    plot.caption = element_text(color = gwu_gold, size = 8, hjust = 1),
+    axis.text.x = element_text(angle = 45, hjust = 1, color = gwu_blue, face = "bold"),
+    axis.text.y = element_text(color = gwu_blue, face = "bold"),
+    panel.grid = element_blank(),
+    legend.position = "right",
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA)
+  )
+
+
+ggsave("loop_seasonal_heatmap.png", width = 12, height = 6, dpi = 300, bg = "white")
+```
+
+### Option 2 
+```{r}
+## REDESIGNED: Semester Clothing Trends + Visitor Growth
+
+# Prepare semester-level data for clothing items
+semester_clothing <- loop_data %>%
+  filter(!is.na(Semester)) %>%
+  pivot_longer(
+    cols = all_of(clothing_items),
+    names_to = "Item_Type",
+    values_to = "Count"
+  ) %>%
+  filter(!is.na(Count), Count > 0) %>%
+  mutate(
+    Year = year(`Visit Date`),
+    # Create a sorting key for proper chronological order
+    Semester_Sort = case_when(
+      Semester == "Spring" ~ paste0(Year, "-1-Spring"),
+      Semester == "Summer" ~ paste0(Year, "-2-Summer"),
+      Semester == "Fall" ~ paste0(Year, "-3-Fall")
+    ),
+    Semester_Year = paste(Semester, Year)
+  ) %>%
+  group_by(Semester_Year, Semester, Year, Semester_Sort, Item_Type) %>%
+  summarise(Total_Items = sum(Count, na.rm = TRUE), .groups = "drop") %>%
+  arrange(Semester_Sort)
+
+# Prepare semester-level data for visitor counts
+semester_visitors <- loop_data %>%
+  filter(!is.na(Semester)) %>%
+  mutate(
+    Year = year(`Visit Date`),
+    # Create matching sorting key
+    Semester_Sort = case_when(
+      Semester == "Spring" ~ paste0(Year, "-1-Spring"),
+      Semester == "Summer" ~ paste0(Year, "-2-Summer"),
+      Semester == "Fall" ~ paste0(Year, "-3-Fall")
+    ),
+    Semester_Year = paste(Semester, Year)
+  ) %>%
+  group_by(Semester_Year, Semester, Year, Semester_Sort) %>%
+  summarise(Total_Visitors = n(), .groups = "drop") %>%
+  arrange(Semester_Sort)
+
+# Create ordered semester factor in chronological order
+semester_order <- unique(semester_clothing$Semester_Year[order(semester_clothing$Semester_Sort)])
+
+semester_clothing$Semester_Year <- factor(semester_clothing$Semester_Year, levels = semester_order)
+semester_visitors$Semester_Year <- factor(semester_visitors$Semester_Year, levels = semester_order)
+
+# Calculate scaling factor for dual axis
+max_items <- max(semester_clothing %>% 
+                   group_by(Semester_Year) %>% 
+                   summarise(total = sum(Total_Items)) %>% 
+                   pull(total))
+max_visitors <- max(semester_visitors$Total_Visitors)
+scale_factor <- max_items / max_visitors
+
+# Create the dual-axis visualization
+ggplot() +
+  # Stacked bar chart for clothing items
+  geom_col(
+    data = semester_clothing,
+    aes(x = Semester_Year, y = Total_Items, fill = Item_Type),
+    alpha = 0.9
+  ) +
+  # Line overlay for visitor count (scaled)
+  geom_line(
+    data = semester_visitors,
+    aes(x = Semester_Year, y = Total_Visitors * scale_factor, group = 1),
+    color = gwu_blue,
+    linewidth = 2,
+    linetype = "solid"
+  ) +
+  geom_point(
+    data = semester_visitors,
+    aes(x = Semester_Year, y = Total_Visitors * scale_factor),
+    color = gwu_blue,
+    size = 4,
+    shape = 21,
+    fill = gwu_gold,
+    stroke = 2
+  ) +
+  # Add visitor count labels
+  geom_text(
+    data = semester_visitors,
+    aes(x = Semester_Year, y = Total_Visitors * scale_factor, 
+        label = paste0(Total_Visitors, " visits")),
+    vjust = -1,
+    color = gwu_blue,
+    fontface = "bold",
+    size = 3.5
+  ) +
+  # Color scale for clothing items
+  scale_fill_manual(
+    values = sustainability_colors,
+    name = "Item Type"
+  ) +
+  # Dual y-axis
+  scale_y_continuous(
+    name = "Total Items Thrifted",
+    labels = scales::comma,
+    sec.axis = sec_axis(
+      ~ . / scale_factor,
+      name = "Number of Visitors",
+      labels = scales::comma
+    ),
+    expand = expansion(mult = c(0, 0.15))
+  ) +
+  # Labels and theme
+  labs(
+    title = "The Loop's Semester Growth: Items & Visitors",
+    subtitle = "Stacked bars show clothing items thrifted | Line shows visitor growth",
+    x = "",
+    caption = "The Loop @ GW Mount Vernon Campus | Jan - October 2025"
+  ) +
+  theme_minimal() +
+theme(
+  plot.title = element_text(color = gwu_blue, face = "bold", size = 16, hjust = 0),
+  plot.subtitle = element_text(color = "#2E8B57", size = 11, hjust = 0),
+  plot.caption = element_text(color = gwu_gold, size = 9, hjust = 1),
+  axis.text.x = element_text(angle = 45, hjust = 1, color = gwu_blue, face = "bold", size = 10),
+  axis.text.y = element_text(color = gwu_blue, face = "bold"),
+  axis.title.y.left = element_text(color = "#2E8B57", face = "bold", size = 11),
+  axis.title.y.right = element_text(color = gwu_blue, face = "bold", size = 11),
+
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+
+  plot.background = element_rect(fill = "white", color = NA),
+  panel.background = element_rect(fill = "white", color = NA),
+
+  legend.position = "right",
+  legend.title = element_text(color = gwu_blue, face = "bold"),
+  legend.text = element_text(color = gwu_blue)
+)
+
+
+ggsave("loop_semester_growth.png", width = 14, height = 8, dpi = 300, bg = "white")
+```
+
+
